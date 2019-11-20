@@ -11,29 +11,29 @@ class ContractController extends Controller {
       addressHex: summary.addressHex.toString('hex'),
       vm: summary.vm,
       type: summary.type,
-      ...summary.type === 'qrc20' ? {
-        qrc20: {
-          name: summary.qrc20.name,
-          symbol: summary.qrc20.symbol,
-          decimals: summary.qrc20.decimals,
-          totalSupply: summary.qrc20.totalSupply.toString(),
-          version: summary.qrc20.version,
-          holders: summary.qrc20.holders,
-          transactions: summary.qrc20.transactions
+      ...summary.type === 'nrc20' ? {
+        nrc20: {
+          name: summary.nrc20.name,
+          symbol: summary.nrc20.symbol,
+          decimals: summary.nrc20.decimals,
+          totalSupply: summary.nrc20.totalSupply.toString(),
+          version: summary.nrc20.version,
+          holders: summary.nrc20.holders,
+          transactions: summary.nrc20.transactions
         }
       } : {},
-      ...summary.type === 'qrc721' ? {
-        qrc721: {
-          name: summary.qrc721.name,
-          symbol: summary.qrc721.symbol,
-          totalSupply: summary.qrc721.totalSupply.toString()
+      ...summary.type === 'nrc721' ? {
+        nrc721: {
+          name: summary.nrc721.name,
+          symbol: summary.nrc721.symbol,
+          totalSupply: summary.nrc721.totalSupply.toString()
         }
       } : {},
       balance: summary.balance.toString(),
       totalReceived: summary.totalReceived.toString(),
       totalSent: summary.totalSent.toString(),
       unconfirmed: summary.unconfirmed.toString(),
-      qrc20Balances: summary.qrc20Balances.map(item => ({
+      nrc20Balances: summary.nrc20Balances.map(item => ({
         address: item.addressHex.toString('hex'),
         addressHex: item.addressHex.toString('hex'),
         name: item.name,
@@ -41,7 +41,7 @@ class ContractController extends Controller {
         decimals: item.decimals,
         balance: item.balance.toString()
       })),
-      qrc721Balances: summary.qrc721Balances.map(item => ({
+      nrc721Balances: summary.nrc721Balances.map(item => ({
         address: item.addressHex.toString('hex'),
         addressHex: item.addressHex.toString('hex'),
         name: item.name,
@@ -114,11 +114,11 @@ class ContractController extends Controller {
     }
   }
 
-  async qrc20BalanceHistory() {
+  async nrc20BalanceHistory() {
     let {ctx} = this
     let tokenAddress = null
     if (ctx.state.token) {
-      if (ctx.state.token.type === 'qrc20') {
+      if (ctx.state.token.type === 'nrc20') {
         tokenAddress = ctx.state.token.contractAddress
       } else {
         ctx.body = {
@@ -128,7 +128,7 @@ class ContractController extends Controller {
         return
       }
     }
-    let {totalCount, transactions} = await ctx.service.qrc20.getQRC20BalanceHistory([ctx.state.contract.contractAddress], tokenAddress)
+    let {totalCount, transactions} = await ctx.service.nrc20.getNRC20BalanceHistory([ctx.state.contract.contractAddress], tokenAddress)
     ctx.body = {
       totalCount,
       transactions: transactions.map(tx => ({
@@ -150,7 +150,7 @@ class ContractController extends Controller {
   }
 
   async callContract() {
-    const {Address} = this.app.qtuminfo.lib
+    const {Address} = this.app.nccinfo.lib
     let {ctx} = this
     let {data, sender} = ctx.query
     ctx.assert(ctx.state.contract.vm === 'evm', 400)

@@ -78,7 +78,7 @@ class BlockService extends Service {
 
   async getRawBlock(arg) {
     const {Header, Transaction} = this.ctx.model
-    const {Header: RawHeader, Block: RawBlock} = this.app.qtuminfo.lib
+    const {Header: RawHeader, Block: RawBlock} = this.app.nccinfo.lib
     let filter
     if (Number.isInteger(arg)) {
       filter = {height: arg}
@@ -307,8 +307,8 @@ class BlockService extends Service {
 
   async getBlockAddressTransactions(height) {
     const {Address, Transaction, BalanceChange, EvmReceipt: EVMReceipt, EvmReceiptLog: EVMReceiptLog, Contract} = this.ctx.model
-    const {Address: RawAddress} = this.app.qtuminfo.lib
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+    const {Address: RawAddress} = this.app.nccinfo.lib
+    const TransferABI = this.app.nccinfo.lib.Solidity.nrc20ABIs.find(abi => abi.name === 'Transfer')
     let result = []
     let balanceChanges = await BalanceChange.findAll({
       attributes: [],
@@ -362,7 +362,7 @@ class BlockService extends Service {
       let set = result[receipt.indexInBlock] = result[receipt.indexInBlock] || new Set()
       set.add(contract.addressString)
       if (Buffer.compare(topic1, TransferABI.id) === 0 && topic3) {
-        if (contract.type === 'qrc20' && !topic4 || contract.type === 'qrc721' && topic4) {
+        if (contract.type === 'nrc20' && !topic4 || contract.type === 'nrc721' && topic4) {
           let sender = topic2.slice(12)
           let receiver = topic3.slice(12)
           if (Buffer.compare(sender, Buffer.alloc(20)) !== 0) {

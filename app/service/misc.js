@@ -3,9 +3,9 @@ const {Service} = require('egg')
 class MiscService extends Service {
   async classify(id) {
     const db = this.ctx.model
-    const {Block, Transaction, Contract, Qrc20: QRC20, where, fn, literal} = db
+    const {Block, Transaction, Contract, Nrc20: NRC20, where, fn, literal} = db
     const {or: $or, like: $like} = this.app.Sequelize.Op
-    const {Address} = this.app.qtuminfo.lib
+    const {Address} = this.app.nccinfo.lib
     const {sql} = this.ctx.helper
     const transaction = this.ctx.state.transaction
 
@@ -46,7 +46,7 @@ class MiscService extends Service {
       }
     } catch (err) {}
 
-    let qrc20Results = (await QRC20.findAll({
+    let nrc20Results = (await NRC20.findAll({
       where: {
         [$or]: [
           where(fn('LOWER', fn('CONVERT', literal('name USING utf8mb4'))), id.toLowerCase()),
@@ -55,9 +55,9 @@ class MiscService extends Service {
       },
       attributes: ['contractAddress'],
       transaction
-    })).map(qrc20 => qrc20.contractAddress)
-    if (qrc20Results.length === 0) {
-      qrc20Results = (await QRC20.findAll({
+    })).map(nrc20 => nrc20.contractAddress)
+    if (nrc20Results.length === 0) {
+      nrc20Results = (await NRC20.findAll({
         where: {
           [$or]: [
             where(fn('LOWER', fn('CONVERT', literal('name USING utf8mb4'))), {[$like]: ['', ...id.toLowerCase(), ''].join('%')}),
@@ -68,16 +68,16 @@ class MiscService extends Service {
         },
         attributes: ['contractAddress'],
         transaction
-      })).map(qrc20 => qrc20.contractAddress)
+      })).map(nrc20 => nrc20.contractAddress)
     }
-    if (qrc20Results.length) {
+    if (nrc20Results.length) {
       let [{addressHex}] = await db.query(sql`
         SELECT contract.address_string AS address, contract.address AS addressHex FROM (
-          SELECT contract_address FROM qrc20_statistics
-          WHERE contract_address IN ${qrc20Results}
+          SELECT contract_address FROM nrc20_statistics
+          WHERE contract_address IN ${nrc20Results}
           ORDER BY transactions DESC LIMIT 1
-        ) qrc20_balance
-        INNER JOIN contract ON contract.address = qrc20_balance.contract_address
+        ) nrc20_balance
+        INNER JOIN contract ON contract.address = nrc20_balance.contract_address
       `, {type: db.QueryTypes.SELECT, transaction})
       return {type: 'contract', address: addressHex.toString('hex'), addressHex: addressHex.toString('hex')}
     }

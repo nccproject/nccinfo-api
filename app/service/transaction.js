@@ -6,11 +6,11 @@ class TransactionService extends Service {
       Header, Address,
       Transaction, Witness, TransactionOutput, TransactionInput, GasRefund,
       EvmReceipt: EVMReceipt, EvmReceiptLog: EVMReceiptLog, ContractSpend,
-      Contract, Qrc20: QRC20, Qrc721: QRC721,
+      Contract, Nrc20: NRC20, Qrc721: QRC721,
       where, col
     } = this.ctx.model
     const {in: $in} = this.app.Sequelize.Op
-    const {Address: RawAddress} = this.app.qtuminfo.lib
+    const {Address: RawAddress} = this.app.nccinfo.lib
 
     let transaction = await Transaction.findOne({
       where: {id},
@@ -190,14 +190,14 @@ class TransactionService extends Service {
             attributes: ['addressString']
           },
           {
-            model: QRC20,
-            as: 'qrc20',
+            model: NRC20,
+            as: 'nrc20',
             required: false,
             attributes: ['name', 'symbol', 'decimals']
           },
           {
             model: QRC721,
-            as: 'qrc721',
+            as: 'nrc721',
             required: false,
             attributes: ['name', 'symbol']
           }
@@ -369,17 +369,17 @@ class TransactionService extends Service {
             addressHex: log.address,
             topics: this.transformTopics(log),
             data: log.data,
-            ...log.qrc20 ? {
-              qrc20: {
-                name: log.qrc20.name,
-                symbol: log.qrc20.symbol,
-                decimals: log.qrc20.decimals
+            ...log.nrc20 ? {
+              nrc20: {
+                name: log.nrc20.name,
+                symbol: log.nrc20.symbol,
+                decimals: log.nrc20.decimals
               }
             } : {},
-            ...log.qrc721 ? {
-              qrc721: {
-                name: log.qrc721.name,
-                symbol: log.qrc721.symbol
+            ...log.nrc721 ? {
+              nrc721: {
+                name: log.nrc721.name,
+                symbol: log.nrc721.symbol
               }
             } : {}
           }))
@@ -403,7 +403,7 @@ class TransactionService extends Service {
 
   async getRawTransaction(id) {
     const {Transaction, Witness, TransactionOutput, TransactionInput} = this.ctx.model
-    const {Transaction: RawTransaction, Input, Output, OutputScript} = this.app.qtuminfo.lib
+    const {Transaction: RawTransaction, Input, Output, OutputScript} = this.app.nccinfo.lib
 
     let transaction = await Transaction.findOne({
       where: {id},
@@ -498,7 +498,7 @@ class TransactionService extends Service {
   }
 
   async getMempoolTransactionAddresses(id) {
-    const {Address: RawAddress} = this.app.qtuminfo.lib
+    const {Address: RawAddress} = this.app.nccinfo.lib
     const {Address, Transaction, BalanceChange, EvmReceipt: EVMReceipt} = this.ctx.model
     let balanceChanges = await BalanceChange.findAll({
       attributes: [],
@@ -538,7 +538,7 @@ class TransactionService extends Service {
   }
 
   async sendRawTransaction(data) {
-    let client = new this.app.qtuminfo.rpc(this.app.config.qtuminfo.rpc)
+    let client = new this.app.nccinfo.rpc(this.app.config.nccinfo.rpc)
     let id = await client.sendrawtransaction(data.toString('hex'))
     return Buffer.from(id, 'hex')
   }
@@ -558,9 +558,9 @@ class TransactionService extends Service {
     let inputs = transaction.inputs.map((input, index) => this.transformInput(input, index, transaction, {brief}))
     let outputs = transaction.outputs.map((output, index) => this.transformOutput(output, index, {brief}))
 
-    let [qrc20TokenTransfers, qrc20TokenUnconfirmedTransfers, qrc721TokenTransfers] = await Promise.all([
-      this.transformQRC20Transfers(transaction.outputs),
-      confirmations === 0 ? this.transformQRC20UnconfirmedTransfers(transaction.outputs) : undefined,
+    let [nrc20TokenTransfers, nrc20TokenUnconfirmedTransfers, nrc721TokenTransfers] = await Promise.all([
+      this.transformNRC20Transfers(transaction.outputs),
+      confirmations === 0 ? this.transformNRC20UnconfirmedTransfers(transaction.outputs) : undefined,
       this.transformQRC721Transfers(transaction.outputs)
     ])
 
@@ -602,14 +602,14 @@ class TransactionService extends Service {
           }))
           : undefined
       },
-      qrc20TokenTransfers,
-      qrc20TokenUnconfirmedTransfers,
-      qrc721TokenTransfers
+      nrc20TokenTransfers,
+      nrc20TokenUnconfirmedTransfers,
+      nrc721TokenTransfers
     }
   }
 
   transformInput(input, index, transaction, {brief}) {
-    const {InputScript, OutputScript} = this.app.qtuminfo.lib
+    const {InputScript, OutputScript} = this.app.nccinfo.lib
     let scriptSig = InputScript.fromBuffer(input.scriptSig, {
       scriptPubKey: OutputScript.fromBuffer(input.scriptPubKey || Buffer.alloc(0)),
       witness: input.witness,
@@ -639,7 +639,7 @@ class TransactionService extends Service {
   }
 
   transformOutput(output, index, {brief}) {
-    const {OutputScript} = this.app.qtuminfo.lib
+    const {OutputScript} = this.app.nccinfo.lib
     let scriptPubKey = OutputScript.fromBuffer(output.scriptPubKey)
     let type = scriptPubKey.isEmpty() ? 'empty' : scriptPubKey.type
     let result = {
@@ -677,20 +677,20 @@ class TransactionService extends Service {
     return result
   }
 
-  async transformQRC20Transfers(outputs) {
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+  async transformNRC20Transfers(outputs) {
+    const TransferABI = this.app.nccinfo.lib.Solidity.nrc20ABIs.find(abi => abi.name === 'Transfer')
     let result = []
     for (let output of outputs) {
       if (output.evmReceipt) {
-        for (let {addressHex, topics, data, qrc20} of output.evmReceipt.logs) {
-          if (qrc20 && topics.length === 3 && Buffer.compare(topics[0], TransferABI.id) === 0 && data.length === 32) {
+        for (let {addressHex, topics, data, nrc20} of output.evmReceipt.logs) {
+          if (nrc20 && topics.length === 3 && Buffer.compare(topics[0], TransferABI.id) === 0 && data.length === 32) {
             let [from, to] = await this.ctx.service.contract.transformHexAddresses([topics[1].slice(12), topics[2].slice(12)])
             result.push({
               address: addressHex.toString('hex'),
               addressHex: addressHex.toString('hex'),
-              name: qrc20.name,
-              symbol: qrc20.symbol,
-              decimals: qrc20.decimals,
+              name: nrc20.name,
+              symbol: nrc20.symbol,
+              decimals: nrc20.decimals,
               ...from && typeof from === 'object' ? {from: from.hex.toString('hex'), fromHex: from.hex.toString('hex')} : {from},
               ...to && typeof to === 'object' ? {to: to.hex.toString('hex'), toHex: to.hex.toString('hex')} : {to},
               value: BigInt(`0x${data.toString('hex')}`).toString()
@@ -704,19 +704,19 @@ class TransactionService extends Service {
     }
   }
 
-  async transformQRC20UnconfirmedTransfers(outputs) {
-    const {OutputScript, Solidity} = this.app.qtuminfo.lib
-    const transferABI = Solidity.qrc20ABIs.find(abi => abi.name === 'transfer')
-    const {Qrc20: QRC20} = this.ctx.model
+  async transformNRC20UnconfirmedTransfers(outputs) {
+    const {OutputScript, Solidity} = this.app.nccinfo.lib
+    const transferABI = Solidity.nrc20ABIs.find(abi => abi.name === 'transfer')
+    const {Nrc20: NRC20} = this.ctx.model
     let result = []
     for (let output of outputs) {
       if (output.evmReceipt) {
-        let qrc20 = await QRC20.findOne({
+        let nrc20 = await NRC20.findOne({
           where: {contractAddress: output.addressHex},
           attributes: ['name', 'symbol', 'decimals'],
           transaction: this.ctx.state.transaction
         })
-        if (!qrc20) {
+        if (!nrc20) {
           continue
         }
         let scriptPubKey = OutputScript.fromBuffer(output.scriptPubKey)
@@ -736,9 +736,9 @@ class TransactionService extends Service {
         result.push({
           address: output.addressHex.toString('hex'),
           addressHex: output.addressHex.toString('hex'),
-          name: qrc20.name,
-          symbol: qrc20.symbol,
-          decimals: qrc20.decimals,
+          name: nrc20.name,
+          symbol: nrc20.symbol,
+          decimals: nrc20.decimals,
           from,
           ...to && typeof to === 'object' ? {to: to.string, toHex: to.hex.toString('hex')} : {to},
           value: value.toString()
@@ -751,18 +751,18 @@ class TransactionService extends Service {
   }
 
   async transformQRC721Transfers(outputs) {
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+    const TransferABI = this.app.nccinfo.lib.Solidity.nrc20ABIs.find(abi => abi.name === 'Transfer')
     let result = []
     for (let output of outputs) {
       if (output.evmReceipt) {
-        for (let {addressHex, topics, qrc721} of output.evmReceipt.logs) {
-          if (qrc721 && topics.length === 4 && Buffer.compare(topics[0], TransferABI.id) === 0) {
+        for (let {addressHex, topics, nrc721} of output.evmReceipt.logs) {
+          if (nrc721 && topics.length === 4 && Buffer.compare(topics[0], TransferABI.id) === 0) {
             let [from, to] = await this.ctx.service.contract.transformHexAddresses([topics[1].slice(12), topics[2].slice(12)])
             result.push({
               address: addressHex.toString('hex'),
               addressHex: addressHex.toString('hex'),
-              name: qrc721.name,
-              symbol: qrc721.symbol,
+              name: nrc721.name,
+              symbol: nrc721.symbol,
               ...from && typeof from === 'object' ? {from: from.hex.toString('hex'), fromHex: from.hex.toString('hex')} : {from},
               ...to && typeof to === 'object' ? {to: to.hex.toString('hex'), toHex: to.hex.toString('hex')} : {to},
               tokenId: topics[3].toString('hex')
@@ -895,7 +895,7 @@ class TransactionService extends Service {
   }
 
   async getContractTransaction(receiptId) {
-    const {Address: RawAddress, OutputScript} = this.app.qtuminfo.lib
+    const {Address: RawAddress, OutputScript} = this.app.nccinfo.lib
     const {
       Header, Address, Transaction, TransactionOutput,
       EvmReceipt: EVMReceipt, EvmReceiptLog: EVMReceiptLog, Contract,

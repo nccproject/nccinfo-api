@@ -8,7 +8,7 @@ const redisConfig = {
   db: 0
 }
 
-exports.keys = 'qtuminfo-api'
+exports.keys = 'nccinfo-api'
 
 exports.security = {
   csrf: {enable: false}
@@ -36,7 +36,7 @@ exports.ratelimit = {
 exports.io = {
   redis: {
     ...redisConfig,
-    key: 'qtuminfo-api-socket.io'
+    key: 'nccinfo-api-socket.io'
   },
   namespace: {
     '/': {connectionMiddleware: ['connection']}
@@ -45,19 +45,19 @@ exports.io = {
 
 exports.sequelize = {
   dialect: 'mysql',
-  database: 'qtum_mainnet',
+  database: 'nccinfo',
   host: 'localhost',
   port: 3306,
-  username: 'qtum',
+  username: 'ncc',
   password: ''
 }
 
-exports.qtum = {
+exports.ncc = {
   chain: 'mainnet'
 }
 
-exports.qtuminfo = {
-  path: path.resolve('..', 'qtuminfo'),
+exports.nccinfo = {
+  path: path.resolve('..', 'nccinfo'),
   port: 3001,
   rpc: {
     protocol: 'http',
@@ -69,3 +69,4 @@ exports.qtuminfo = {
 }
 
 exports.cmcAPIKey = null
+

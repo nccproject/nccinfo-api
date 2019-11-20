@@ -2,7 +2,7 @@ const {Service} = require('egg')
 
 class ContractService extends Service {
   async getContractAddresses(list) {
-    const {Address} = this.app.qtuminfo.lib
+    const {Address} = this.app.nccinfo.lib
     const chain = this.app.chain
     const {Contract} = this.ctx.model
 
@@ -34,26 +34,26 @@ class ContractService extends Service {
   }
 
   async getContractSummary(contractAddress, addressIds) {
-    const {Contract, Qrc20: QRC20, Qrc20Statistics: QRC20Statistics, Qrc721: QRC721} = this.ctx.model
-    const {balance: balanceService, qrc20: qrc20Service, qrc721: qrc721Service} = this.ctx.service
+    const {Contract, Nrc20: NRC20, Nrc20Statistics: NRC20Statistics, Qrc721: QRC721} = this.ctx.model
+    const {balance: balanceService, nrc20: nrc20Service, nrc721: nrc721Service} = this.ctx.service
     let contract = await Contract.findOne({
       where: {address: contractAddress},
       attributes: ['addressString', 'vm', 'type'],
       include: [
         {
-          model: QRC20,
-          as: 'qrc20',
+          model: NRC20,
+          as: 'nrc20',
           required: false,
           attributes: ['name', 'symbol', 'decimals', 'totalSupply', 'version'],
           include: [{
-            model: QRC20Statistics,
+            model: NRC20Statistics,
             as: 'statistics',
             required: true
           }]
         },
         {
           model: QRC721,
-          as: 'qrc721',
+          as: 'nrc721',
           required: false,
           attributes: ['name', 'symbol', 'totalSupply']
         }
@@ -63,14 +63,14 @@ class ContractService extends Service {
     let [
       {totalReceived, totalSent},
       unconfirmed,
-      qrc20Balances,
-      qrc721Balances,
+      nrc20Balances,
+      nrc721Balances,
       transactionCount
     ] = await Promise.all([
       balanceService.getTotalBalanceChanges(addressIds),
       balanceService.getUnconfirmedBalance(addressIds),
-      qrc20Service.getAllQRC20Balances([contractAddress]),
-      qrc721Service.getAllQRC721Balances([contractAddress]),
+      nrc20Service.getAllNRC20Balances([contractAddress]),
+      nrc721Service.getAllQRC721Balances([contractAddress]),
       this.getContractTransactionCount(contractAddress, addressIds)
     ])
     return {
@@ -78,36 +78,36 @@ class ContractService extends Service {
       addressHex: contractAddress,
       vm: contract.vm,
       type: contract.type,
-      ...contract.type === 'qrc20' ? {
-        qrc20: {
-          name: contract.qrc20.name,
-          symbol: contract.qrc20.symbol,
-          decimals: contract.qrc20.decimals,
-          totalSupply: contract.qrc20.totalSupply,
-          version: contract.qrc20.version,
-          holders: contract.qrc20.statistics.holders,
-          transactions: contract.qrc20.statistics.transactions
+      ...contract.type === 'nrc20' ? {
+        nrc20: {
+          name: contract.nrc20.name,
+          symbol: contract.nrc20.symbol,
+          decimals: contract.nrc20.decimals,
+          totalSupply: contract.nrc20.totalSupply,
+          version: contract.nrc20.version,
+          holders: contract.nrc20.statistics.holders,
+          transactions: contract.nrc20.statistics.transactions
         }
       } : {},
-      ...contract.type === 'qrc721' ? {
-        qrc721: {
-          name: contract.qrc721.name,
-          symbol: contract.qrc721.symbol,
-          totalSupply: contract.qrc721.totalSupply
+      ...contract.type === 'nrc721' ? {
+        nrc721: {
+          name: contract.nrc721.name,
+          symbol: contract.nrc721.symbol,
+          totalSupply: contract.nrc721.totalSupply
         }
       } : {},
       balance: totalReceived - totalSent,
       totalReceived,
       totalSent,
       unconfirmed,
-      qrc20Balances,
-      qrc721Balances,
+      nrc20Balances,
+      nrc721Balances,
       transactionCount
     }
   }
 
   async getContractTransactionCount(contractAddress, addressIds) {
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+    const TransferABI = this.app.nccinfo.lib.Solidity.nrc20ABIs.find(abi => abi.name === 'Transfer')
     const db = this.ctx.model
     let {sql} = this.ctx.helper
     let topic = Buffer.concat([Buffer.alloc(12), contractAddress])
@@ -126,12 +126,12 @@ class ContractService extends Service {
         SELECT receipt.transaction_id AS transaction_id FROM evm_receipt receipt, evm_receipt_log log, contract
         WHERE log.receipt_id = receipt._id
           AND ${this.ctx.service.block.getRawBlockFilter('receipt.block_height')}
-          AND contract.address = log.address AND contract.type IN ('qrc20', 'qrc721')
+          AND contract.address = log.address AND contract.type IN ('nrc20', 'nrc721')
           AND log.topic1 = ${TransferABI.id}
           AND (log.topic2 = ${topic} OR log.topic3 = ${topic})
           AND (
-            (contract.type = 'qrc20' AND log.topic3 IS NOT NULL AND log.topic4 IS NULL)
-            OR (contract.type = 'qrc721' AND log.topic4 IS NOT NULL)
+            (contract.type = 'nrc20' AND log.topic3 IS NOT NULL AND log.topic4 IS NULL)
+            OR (contract.type = 'nrc721' AND log.topic4 IS NOT NULL)
           )
       ) list
     `, {type: db.QueryTypes.SELECT, transaction: this.ctx.state.transaction})
@@ -139,7 +139,7 @@ class ContractService extends Service {
   }
 
   async getContractTransactions(contractAddress, addressIds) {
-    const TransferABI = this.app.qtuminfo.lib.Solidity.qrc20ABIs.find(abi => abi.name === 'Transfer')
+    const TransferABI = this.app.nccinfo.lib.Solidity.nrc20ABIs.find(abi => abi.name === 'Transfer')
     const db = this.ctx.model
     let {sql} = this.ctx.helper
     let {limit, offset, reversed = true} = this.ctx.state.pagination
@@ -164,12 +164,12 @@ class ContractService extends Service {
           FROM evm_receipt receipt, evm_receipt_log log, contract
           WHERE log.receipt_id = receipt._id
             AND ${this.ctx.service.block.getRawBlockFilter('receipt.block_height')}
-            AND contract.address = log.address AND contract.type IN ('qrc20', 'qrc721')
+            AND contract.address = log.address AND contract.type IN ('nrc20', 'nrc721')
             AND log.topic1 = ${TransferABI.id}
             AND (log.topic2 = ${topic} OR log.topic3 = ${topic})
             AND (
-              (contract.type = 'qrc20' AND log.topic3 IS NOT NULL AND log.topic4 IS NULL)
-              OR (contract.type = 'qrc721' AND log.topic4 IS NOT NULL)
+              (contract.type = 'nrc20' AND log.topic3 IS NOT NULL AND log.topic4 IS NULL)
+              OR (contract.type = 'nrc721' AND log.topic4 IS NOT NULL)
             )
         ) list
         ORDER BY block_height ${{raw: order}}, index_in_block ${{raw: order}}, _id ${{raw: order}}
@@ -193,7 +193,7 @@ class ContractService extends Service {
   }
 
   async getContractBasicTransactions(contractAddress) {
-    const {Address, OutputScript} = this.app.qtuminfo.lib
+    const {Address, OutputScript} = this.app.nccinfo.lib
     const {
       Header, Transaction, TransactionOutput, Contract, EvmReceipt: EVMReceipt, EvmReceiptLog: EVMReceiptLog,
       where, col
@@ -287,7 +287,7 @@ class ContractService extends Service {
   }
 
   async callContract(contract, data, sender) {
-    let client = new this.app.qtuminfo.rpc(this.app.config.qtuminfo.rpc)
+    let client = new this.app.nccinfo.rpc(this.app.config.nccinfo.rpc)
     return await client.callcontract(
       contract.toString('hex'),
       data.toString('hex'),
@@ -296,7 +296,7 @@ class ContractService extends Service {
   }
 
   async searchLogs({contract, topic1, topic2, topic3, topic4} = {}) {
-    const {Address} = this.app.qtuminfo.lib
+    const {Address} = this.app.nccinfo.lib
     const db = this.ctx.model
     const {Header, Transaction, EvmReceipt: EVMReceipt, EvmReceiptLog: EVMReceiptLog, Contract} = db
     const {in: $in} = this.ctx.app.Sequelize.Op
@@ -393,7 +393,7 @@ class ContractService extends Service {
     }
     const {Contract} = this.ctx.model
     const {in: $in} = this.app.Sequelize.Op
-    const {Address} = this.app.qtuminfo.lib
+    const {Address} = this.app.nccinfo.lib
     let result = addresses.map(address => Buffer.compare(address, Buffer.alloc(20)) === 0 ? null : address)
 
     let contracts = await Contract.findAll({
