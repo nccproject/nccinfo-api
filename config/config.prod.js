@@ -3,7 +3,7 @@ exports.security = {
 }
 // or
 exports.cors = {
-    origin: '*'  // Access-Control-Allow-Origin: *
+    origin: '*.ncccoin.biz'  // Access-Control-Allow-Origin: *
 }
 
 exports.sequelize = {
